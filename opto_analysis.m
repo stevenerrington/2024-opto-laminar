@@ -12,18 +12,129 @@ dirs = set_directories();
 optoLog = webread(sprintf('https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv&sheet=%s',...
     '1_kpK6t0yXWO5wVneRrX4kspHJXAnouSg', 'opto'));
 
-%% Extract example LFP's for each condition
-% Local field potential data -------------------------------------------------------
+%% LFP Conditions
 clear session_idx
 session_idx.blue_05hz = 184;
 session_idx.blue_40hz = 185;
 session_idx.red_05hz = 187;
 session_idx.red_40hz = 186;
 cond_labels = fieldnames(session_idx);
-
 ops.timewin = [-1000:5000];
 
-figuren('Renderer', 'painters', 'Position', [100 100 800 300]);
+%% ERSP for each condition
+for cond_i = 1:4
+    clear data_in stim_trials
+
+    data_in = load(fullfile(dirs.mat_data,optoLog.session{session_idx.(cond_labels{cond_i})}));
+    ops.aligntime = data_in.opto_event.laserOnset_ms;
+    stim_trials = find(~isnan(ops.aligntime));
+
+    clear lfp* data  nan_trials nan_trials_idx valid_trials_idx
+
+    % Run alignment algorithms
+    ops.timewin = -1000:5000;
+    ops.freq = [2 200];
+    [~, signal_out] = get_lfp_aligned(data_in.lfp,ops.aligntime,ops);
+
+
+    nan_trials = []; nan_trials_idx = []; valid_trials_idx = [];
+    nan_trials = isnan(signal_out);
+    nan_trials_idx = squeeze(nan_trials(1,:,:));
+    valid_trials_idx = find(nan_trials_idx(1,:) == 0);
+
+    data = signal_out(1:16,:,valid_trials_idx);
+
+    % EEGlab analysis %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Parameters and configuration -----------------------------------------
+    srate =  1000; % Sampling rate (Hz)
+    epochmin = ops.timewin(1)/1000; % Epoch start (sec)
+    epochmax = ops.timewin(end)/1000; % Epoch end (sec)
+    basemin = -500; % Baseline window start (ms)
+    basemax = 0; % Baseline window end (ms)
+
+    clear nTr in
+    nTr=size(data,3); % Number of trials
+    in(:,1)=[1:nTr]'; % Dummy variable for trial n
+    in(:,2)=abs(epochmin)*ones(nTr,1); % Dummy variable for trial n
+
+    freq_range=[2.5 100]; % Frequency range for ERSP analysis
+    maxfreq = max(freq_range); % Max frequency
+    padratio = 2; % Pad ratio
+    alpha_val = 0.01; % Alpha
+    maxersp = 6;
+
+
+    % Setup data ------------------------------------------------------------
+    clear EEG
+
+    % - Structure data for EEGlab -------------------------------------------
+    % (adapted from YK earlier matlab code)
+    EEG = pop_importdata('dataformat', 'array', 'data', 'data', 'srate',srate, 'nbchan',32);
+    EEG = eeg_checkset(EEG);
+
+    % - Define epochs (although data is already aligned)
+    EEG = pop_importepoch(EEG, in, { 'Epoch', 'stim'}, 'latencyfields',{ 'stim'}, 'timeunit',1, 'headerlines',0);
+    EEG = eeg_checkset( EEG );
+    EEG = pop_epoch( EEG, {  'stim'  }, [epochmin         epochmax], 'newname', 'Level epochs', 'epochinfo', 'yes');
+    EEG = eeg_checkset( EEG );
+
+    % - Perform baseline correction
+    EEG = pop_rmbase( EEG, [basemin    0]);
+    EEG = eeg_checkset( EEG );
+
+    chan_i = 10;
+
+    clear ersp itc powbase times freqs erspboot itcboot alltfX
+
+    fprintf('Running analysis on channel %i \n', chan_i)
+    [ersp,itc,powbase,times,freqs,erspboot,itcboot,alltfX] = pop_newtimef(EEG, ...
+        1, chan_i, [EEG.xmin EEG.xmax]*srate, [3 0.7], 'maxfreq',maxfreq, 'freqs',freq_range,'padratio', padratio, ...
+        'plotphase', 'off', 'alpha', alpha_val, 'naccu', 200, 'baseboot',1,'rmerp','off', ...
+        'erspmax', maxersp, 'plotersp','off', 'plotitc','off','baseline',[basemin basemax],'marktimes',0);
+
+    clear psd_freqs psd_values
+    [psd_values, psd_freqs] = pop_spectopo(EEG, 1, [0 1] * srate, 'EEG', ...
+                                      'freqrange', freq_range, 'plotchan', chan_i, 'electrodes', 'off','plot','off');
+
+    ersp_out{cond_i} = ersp;
+    times_out{cond_i} = times;
+    freqs_out{cond_i} = freqs;
+    psd_out{cond_i} = psd_values;
+    psd_freqs_out{cond_i} = psd_freqs;
+end
+
+% Figure %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+colorscale_blue = abs(cbrewer('seq','Blues',500));
+colorscale_red = abs(cbrewer('seq','Reds',500));
+
+figuren('Renderer', 'painters', 'Position', [100 100 900 400]);
+ax1 = subplot(2,2,1);
+imagesc('XData',times_out{1},'YData',freqs_out{1},'CData',ersp_out{1})
+xlim([-200 1500]); ylim([min(freqs_out{1}) 50])
+vline([0 1000], 'k-');
+colorbar; colormap(ax1, colorscale_blue); clim([0 5])
+
+ax2 = subplot(2,2,3);
+imagesc('XData',times_out{3},'YData',freqs_out{3},'CData',ersp_out{3})
+xlim([-200 1500]); ylim([min(freqs_out{3}) 50])
+vline([0 1000], 'k-');
+colorbar; colormap(ax2, colorscale_red); clim([0 5])
+
+ax3 = subplot(2,2,2);
+imagesc('XData',times_out{2},'YData',freqs_out{2},'CData',ersp_out{2})
+xlim([-200 1500]); ylim([min(freqs_out{2}) 50])
+vline([0 1000], 'k-');
+colorbar; colormap(ax3, colorscale_blue); clim([0 10])
+
+ax4 = subplot(2,2,4);
+imagesc('XData',times_out{4},'YData',freqs_out{4},'CData',ersp_out{4})
+xlim([-200 1500]); ylim([min(freqs_out{4}) 50])
+vline([0 1000], 'k-');
+colorbar; colormap(ax4, colorscale_red); clim([0 10])
+
+
+%% Extract example LFP's for each condition
+figuren('Renderer', 'painters', 'Position', [100 100 900 100]);
 
 for cond_i = 1:length(cond_labels)
     clear data_in stim_trials
@@ -43,9 +154,17 @@ for cond_i = 1:length(cond_labels)
         line_color = 'red';
     end
 
-    subplot(2,2,cond_i)
+    if cond_i == 1 | cond_i == 3
+        subplot_i = 1;
+        ylim_i = [-80 80];
+    else 
+        subplot_i = 2;
+        ylim_i = [-40 40];
+    end
+
+    subplot(1,2,subplot_i); hold on
     plot(ops.timewin, nanmean(lfp_array_aligned(10,:,stim_trials),3),'LineWidth',1,'Color',line_color)
-    xlim([-250 1500]); ylim([-80 80]); yticks([-80:40:80]); box off
+    xlim([-250 1500]); ylim(ylim_i); yticks([-80:40:80]); box off
     vline(0,'k')
 
     if cond_i == 1 | cond_i == 2
@@ -54,7 +173,21 @@ for cond_i = 1:length(cond_labels)
 
 end
 
+%% 
+figuren('Renderer', 'painters', 'Position', [100 100 600 450]); hold on
+subplot(2,2,[1 3]); hold on
+plot(psd_freqs_out{1},psd_out{1}(10,:),'color',colorscale_blue(size(colorscale_blue,1),:),'LineWidth',1)
+plot(psd_freqs_out{2},psd_out{2}(10,:),'color',colorscale_blue(size(colorscale_blue,1)/2,:),'LineWidth',1)
+plot(psd_freqs_out{1},psd_out{3}(10,:),'color',colorscale_red(size(colorscale_red,1),:),'LineWidth',1)
+plot(psd_freqs_out{2},psd_out{4}(10,:),'color',colorscale_red(size(colorscale_red,1)/2,:),'LineWidth',1)
+xlim([0 45])
 
+subplot(2,2,[2]); hold on
+plot(psd_freqs_out{1},psd_out{1}(10,:),'color',colorscale_blue(size(colorscale_blue,1),:),'LineWidth',1)
+plot(psd_freqs_out{2},psd_out{2}(10,:),'color',colorscale_blue(size(colorscale_blue,1)/2,:),'LineWidth',1)
+plot(psd_freqs_out{1},psd_out{3}(10,:),'color',colorscale_red(size(colorscale_red,1),:),'LineWidth',1)
+plot(psd_freqs_out{2},psd_out{4}(10,:),'color',colorscale_red(size(colorscale_red,1)/2,:),'LineWidth',1)
+xlim([0 10]); ylim([20 35])
 
 %% Extract laminar LFP's
 clear data_in stim_trials
@@ -125,12 +258,6 @@ plot(delta_power,1:16,'Color',color_line)
 set(gca,'ydir', 'reverse')
 set(gca,'Ycolor', 'None')
 xlim([-5 30]); ylim([0 17]); yticks([-5:5:30])
-
-
-%% 
-
-
-
 
 
 %% Single unit
