@@ -23,7 +23,7 @@ optoLog = webread(sprintf('https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx
 
 session_list = [316, 318, 319, 320];
 neuron_frontal_label_list = {'DSP26b','DSP26b','DSP26b','DSP26b'};
-neuron_auditory_label_list = {'DSP15c','DSP15b','DSP15b','DSP15b'};
+neuron_auditory_label_list = {'DSP15a','DSP15a','DSP15a','DSP15a'};
 
 for session_list_i = 1:length(session_list)
 

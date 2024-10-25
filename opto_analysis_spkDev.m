@@ -22,8 +22,8 @@ optoLog = webread(sprintf('https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx
     '1_kpK6t0yXWO5wVneRrX4kspHJXAnouSg', 'opto'));
 
 
-session_name = {'troy-opto-2021-08-25a', 'troy-opto-2021-08-25b', 'troy-opto-2021-08-25c', 'troy-opto-2021-08-25d'};
-cond_name = {'1_Blue 40 Hz', '2_Red 40 Hz', '4_Red 05 Hz', '3_Blue 05 Hz'};
+session_name = {'troy-opto-2021-11-22a', 'troy-opto-2021-11-22b', 'troy-opto-2021-11-22c'};
+cond_name = {'1_Blue 05 Hz', '2_Blue 40 Hz', '3_Red 40 Hz'};
 
 
 for session_loop_i = 1:4
@@ -73,29 +73,22 @@ end
 
 %% Spike density function
 
-unit = 'DSP15a';
+unit = 'DSP26b';
 xlim_val = [-500 1500];
 clear opto_singleunit_fig
 
-opto_singleunit_fig(1,1)=gramm('x',[raster{1}.(unit); raster{2}.(unit)],...
-    'color',[repmat(cond_name(1),length(raster{1}.(unit)),1); repmat(cond_name(2),length(raster{2}.(unit)),1)]);
+cond = 1;
+
+opto_singleunit_fig(1,1)=gramm('x',[raster{cond}.(unit)],...
+    'color',[repmat(cond_name(1),length(raster{cond}.(unit)),1)]);
 opto_singleunit_fig(1,1).geom_raster('geom',{'line'});
 opto_singleunit_fig(1,1).axe_property('XLim',xlim_val);
 
-opto_singleunit_fig(2,1)=gramm('x',ops.timewin,'y',[sdf{1}.(unit); sdf{2}.(unit)],...
-    'color',[repmat(cond_name(1),size(sdf{1}.(unit),1),1); repmat(cond_name(2),size(sdf{2}.(unit),1),1)]);
+opto_singleunit_fig(2,1)=gramm('x',ops.timewin,'y',[sdf{cond}.(unit)],...
+    'color',[repmat(cond_name(1),size(sdf{cond}.(unit),1),1)]);
 opto_singleunit_fig(2,1).stat_summary();
 opto_singleunit_fig(2,1).axe_property('XLim',xlim_val,'YLim',[0 40]);
 
-opto_singleunit_fig(1,2)=gramm('x',[raster{4}.(unit); raster{3}.(unit)],...
-    'color',[repmat(cond_name(4),length(raster{4}.(unit)),1); repmat(cond_name(3),length(raster{3}.(unit)),1)]);
-opto_singleunit_fig(1,2).geom_raster('geom',{'line'});
-opto_singleunit_fig(1,2).axe_property('XLim',xlim_val);
-
-opto_singleunit_fig(2,2)=gramm('x',ops.timewin,'y',[sdf{4}.(unit); sdf{3}.(unit)],...
-    'color',[repmat(cond_name(4),size(sdf{4}.(unit),1),1); repmat(cond_name(3),size(sdf{3}.(unit),1),1)]);
-opto_singleunit_fig(2,2).stat_summary();
-opto_singleunit_fig(2,2).axe_property('XLim',xlim_val,'YLim',[0 40]);
 
 
 opto_singleunit_fig(1,1).set_layout_options...
@@ -111,18 +104,6 @@ opto_singleunit_fig(2,1).set_layout_options...
     'margin_width',[0.0 0.00],...
     'redraw',false);
 
-opto_singleunit_fig(1,2).set_layout_options...
-    ('Position',[0.5 0.6 0.35 0.25],... %Set the position in the figure (as in standard 'Position' axe property)
-    'legend',false,...
-    'margin_height',[0.00 0.00],... %We set custom margins, values must be coordinated between the different elements so that alignment is maintained
-    'margin_width',[0.0 0.00],...
-    'redraw',false);
-
-opto_singleunit_fig(2,2).set_layout_options...
-    ('Position',[0.5 0.1 0.35 0.4],... %Set the position in the figure (as in standard 'Position' axe property)
-    'margin_height',[0.00 0.00],... %We set custom margins, values must be coordinated between the different elements so that alignment is maintained
-    'margin_width',[0.0 0.00],...
-    'redraw',false);
 
 figure('Renderer', 'painters', 'Position', [100 100 1000 600]);
 opto_singleunit_fig.draw();

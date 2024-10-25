@@ -45,6 +45,12 @@ single_unit_rastersdf_figure(spikes,ops)
 
 
 
+nan_trials = []; nan_trials_idx = []; valid_trials_idx = [];
+nan_trials = isnan(lfp_array);
+nan_trials_idx = squeeze(nan_trials(1,:,:));
+valid_trials_idx = find(nan_trials_idx(1,:) == 0);
+
+lfp_array = lfp_array(:,:,valid_trials_idx);
 
 baseline_lfp_activity = reshape(lfp_array(:,1000+[-999:0],:), n_channels, length([-999:0]) * size(lfp_array,3));
 stimulation_lfp_activity = reshape(lfp_array(:,1000+[0:999],:), n_channels, length([-999:0]) * size(lfp_array,3));
